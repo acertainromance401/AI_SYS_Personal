@@ -221,7 +221,159 @@
 - 학습 이력 기반 개인화 복습 스케줄링
 - 관리자용 품질 검수 대시보드
 
-## 10. 시각자료 (Mermaid)
+## 10. PostgreSQL 기준 DB 스키마 초안
+
+### 10.1 설계 원칙
+- 원문은 기준 데이터이므로 가능한 한 원본에 가깝게 보관한다.
+- 검색과 요약에 필요한 메타데이터는 원문과 분리해 구조화한다.
+- RAG 검색용 청크와 키워드는 별도 테이블로 관리한다.
+- 사용자 복습 데이터는 판례 데이터와 직접 연결 가능하도록 관계형 구조를 유지한다.
+
+### 10.2 핵심 테이블
+
+#### cases
+- 역할: 판례 기본 정보와 원문 텍스트 저장
+- 주요 컬럼:
+  - id
+  - case_number
+  - case_name
+  - court_name
+  - decision_date
+  - case_type
+  - subject
+  - raw_text
+  - issue_summary
+  - holding_summary
+  - exam_points
+  - source_url
+  - source_name
+  - status
+  - collected_at
+  - updated_at
+
+#### case_chunks
+- 역할: 원문을 검색 및 RAG용 단위로 분할 저장
+- 주요 컬럼:
+  - id
+  - case_id
+  - chunk_index
+  - chunk_text
+  - token_count
+  - embedding_vector 또는 vector_ref
+  - created_at
+
+#### case_keywords
+- 역할: 검색용 키워드와 가중치 저장
+- 주요 컬럼:
+  - id
+  - case_id
+  - keyword
+  - weight
+  - created_at
+
+#### case_relations
+- 역할: 유사 판례, 관련 판례, 반대 취지 판례 연결
+- 주요 컬럼:
+  - id
+  - source_case_id
+  - target_case_id
+  - relation_type
+  - score
+  - created_at
+
+#### user_case_history
+- 역할: 사용자 조회, 오답, 복습 이력 저장
+- 주요 컬럼:
+  - id
+  - user_id
+  - case_id
+  - viewed_at
+  - wrong_count
+  - confidence_level
+  - review_due_at
+  - created_at
+  - updated_at
+
+### 10.3 SQL 예시
+
+```sql
+create table cases (
+    id bigserial primary key,
+    case_number varchar(100) not null unique,
+    case_name varchar(255) not null,
+    court_name varchar(100) not null,
+    decision_date date,
+    case_type varchar(100),
+    subject varchar(100),
+    raw_text text not null,
+    issue_summary text,
+    holding_summary text,
+    exam_points text,
+    source_url text,
+    source_name varchar(100),
+    status varchar(50) not null default 'collected',
+    collected_at timestamptz not null default now(),
+    updated_at timestamptz not null default now()
+);
+
+create table case_chunks (
+    id bigserial primary key,
+    case_id bigint not null references cases(id) on delete cascade,
+    chunk_index integer not null,
+    chunk_text text not null,
+    token_count integer,
+    vector_ref text,
+    created_at timestamptz not null default now(),
+    unique (case_id, chunk_index)
+);
+
+create table case_keywords (
+    id bigserial primary key,
+    case_id bigint not null references cases(id) on delete cascade,
+    keyword varchar(100) not null,
+    weight numeric(5,2) not null default 1.00,
+    created_at timestamptz not null default now()
+);
+
+create table case_relations (
+    id bigserial primary key,
+    source_case_id bigint not null references cases(id) on delete cascade,
+    target_case_id bigint not null references cases(id) on delete cascade,
+    relation_type varchar(50) not null,
+    score numeric(5,2),
+    created_at timestamptz not null default now()
+);
+
+create table user_case_history (
+    id bigserial primary key,
+    user_id bigint not null,
+    case_id bigint not null references cases(id) on delete cascade,
+    viewed_at timestamptz,
+    wrong_count integer not null default 0,
+    confidence_level varchar(20),
+    review_due_at timestamptz,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    unique (user_id, case_id)
+);
+```
+
+### 10.4 적재 예시 흐름
+- 운영자가 판례 원문과 기본 메타데이터를 확보한다.
+- cases에 원문과 사건번호, 판례명, 법원명, 과목, 출처를 저장한다.
+- 원문을 단락 또는 토큰 단위로 분리해 case_chunks에 저장한다.
+- 검색 키워드와 시험 포인트를 생성해 case_keywords와 cases 요약 필드에 반영한다.
+- 유사 판례 연결이 확인되면 case_relations에 저장한다.
+- 사용자 풀이 및 오답 데이터는 user_case_history에 누적한다.
+
+### 10.5 운영 메모
+- MVP에서는 PostgreSQL 단일 DB로 시작하고, 임베딩 저장은 vector_ref 또는 pgvector 확장 적용 여부에 따라 결정한다.
+- 사건번호 검색은 exact match 인덱스를 사용한다.
+- 키워드 검색은 case_keywords와 cases 메타데이터 필드를 함께 사용한다.
+- 요약 생성 시에는 raw_text 전체 대신 case_chunks 상위 결과만 LLM에 전달한다.
+- status 값은 collected, parsed, reviewed, published 정도로 단순하게 시작하는 것이 적절하다.
+
+## 11. 시각자료 (Mermaid)
 
 ```mermaid
 flowchart LR
