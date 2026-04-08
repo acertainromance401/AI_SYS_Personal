@@ -270,3 +270,18 @@ FROM published_cases
 ORDER BY updated_at DESC
 LIMIT 20;
 ```
+
+## 15. 수집 데이터 저장 위치 표준
+
+수집한 판례 원문 및 정제 산출물은 아래 경로를 사용한다.
+
+- `code/data/raw/`: 수집 원문(원본)
+- `code/data/normalized/`: 정규화 완료 데이터
+- `code/data/reviewed/`: 검수 완료 데이터
+- `code/data/failed/`: 실패/반려 데이터
+- `code/data/manifests/`: 수집/적재 이력 메타 파일
+
+운영 원칙
+- 원문(raw) 데이터는 Git 커밋 대상에서 제외하고 외부 저장소 보관을 우선한다.
+- 게시 파이프라인 입력은 reviewed 데이터만 사용한다.
+- 모든 배치 실행 결과는 manifests에 이력으로 남긴다.
