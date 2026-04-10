@@ -10,6 +10,14 @@
 - [Project_Descriptions/Wireframe_AI_SYS.md](Project_Descriptions/Wireframe_AI_SYS.md)
 - [Project_Descriptions/Screen_Flow_AI_SYS.md](Project_Descriptions/Screen_Flow_AI_SYS.md)
 - [Project_Descriptions/Technology_Stack_AI_SYS.md](Project_Descriptions/Technology_Stack_AI_SYS.md)
+- [code/Data_Build_Guide_AI_SYS.md](code/Data_Build_Guide_AI_SYS.md)
+- [code/Run_Guide_AI_SYS.md](code/Run_Guide_AI_SYS.md)
+- [code/db/schema.sql](code/db/schema.sql)
+- [code/db/seed.sql](code/db/seed.sql)
+- [code/data/README.md](code/data/README.md)
+- [code/backend/README.md](code/backend/README.md)
+- [docker-compose.yml](docker-compose.yml)
+- [code/backend/Dockerfile](code/backend/Dockerfile)
 
 ## 1. 팀 소개
 - 팀 이름: 까짓것 돌려보조

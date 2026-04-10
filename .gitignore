@@ -1,0 +1,24 @@
+# Python virtual environments
+.venv/
+**/.venv/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# OS/editor
+.DS_Store
+.vscode/
+
+# AI_SYS data workspace (keep structure only)
+code/data/raw/*
+code/data/normalized/*
+code/data/reviewed/*
+code/data/failed/*
+code/data/manifests/*
+!code/data/raw/.gitkeep
+!code/data/normalized/.gitkeep
+!code/data/reviewed/.gitkeep
+!code/data/failed/.gitkeep
+!code/data/manifests/.gitkeep
