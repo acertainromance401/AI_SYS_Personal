@@ -8,12 +8,17 @@
 
 /* Begin PBXBuildFile section */
 		0134EB00FCADE9C6760E94C3 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = D71F7EC6215383E28B8504D6 /* Models.swift */; };
+		0B7A2E2CC0663A1C2DB09513 /* PromptTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 48EC9808C4C60B63E6BAC9E9 /* PromptTemplates.swift */; };
 		17842704C3A11AEB56ED1DAA /* AISYSAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AC5138A411C914DB4D5AE9F /* AISYSAppTests.swift */; };
+		1C43007E9CD651F2878094CB /* LLMService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80EB6CEDE58FD30A4BC467BE /* LLMService.swift */; };
+		24D17AE6F904AB34297D556D /* NetworkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE170875E59DB4941C4441FB /* NetworkService.swift */; };
 		33B554E67648A09D2B3FA223 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6FD11294844C01BF1B041A12 /* RootTabView.swift */; };
+		69718A360E32436E7D1A3273 /* LocalLLMEngines.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0924461A409E76F7CC7881A /* LocalLLMEngines.swift */; };
 		8996C6B976101B7FBEA8CD20 /* AISYSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EB8550D7167F38BF77BC796 /* AISYSApp.swift */; };
 		A562AF02780501D1737514AE /* OCRView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 188D4A67A763047523D31AE1 /* OCRView.swift */; };
 		B932ED19AEA38751B581B486 /* SearchFlowViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0A7D33042C8959C4D5E809 /* SearchFlowViews.swift */; };
 		C4DABF681E9D0290768E3FB4 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F408ACC8D034B72FF9346C76 /* HomeView.swift */; };
+		F712F650434C229033AFC935 /* CaseSummaryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC16EFD30739BDD18535D6D1 /* CaseSummaryViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -29,13 +34,18 @@
 /* Begin PBXFileReference section */
 		188D4A67A763047523D31AE1 /* OCRView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCRView.swift; sourceTree = "<group>"; };
 		353E1A434AF9C763B420648A /* AISYSAppTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AISYSAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		48EC9808C4C60B63E6BAC9E9 /* PromptTemplates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptTemplates.swift; sourceTree = "<group>"; };
 		4EB8550D7167F38BF77BC796 /* AISYSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISYSApp.swift; sourceTree = "<group>"; };
 		6FD11294844C01BF1B041A12 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		7AC5138A411C914DB4D5AE9F /* AISYSAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AISYSAppTests.swift; sourceTree = "<group>"; };
+		80EB6CEDE58FD30A4BC467BE /* LLMService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMService.swift; sourceTree = "<group>"; };
 		A012500B9935794B1603D393 /* AISYSApp.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = AISYSApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D71F7EC6215383E28B8504D6 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		E0924461A409E76F7CC7881A /* LocalLLMEngines.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalLLMEngines.swift; sourceTree = "<group>"; };
 		EF0A7D33042C8959C4D5E809 /* SearchFlowViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchFlowViews.swift; sourceTree = "<group>"; };
 		F408ACC8D034B72FF9346C76 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		FC16EFD30739BDD18535D6D1 /* CaseSummaryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaseSummaryViewModel.swift; sourceTree = "<group>"; };
+		FE170875E59DB4941C4441FB /* NetworkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NetworkService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -69,9 +79,14 @@
 			isa = PBXGroup;
 			children = (
 				4EB8550D7167F38BF77BC796 /* AISYSApp.swift */,
+				FC16EFD30739BDD18535D6D1 /* CaseSummaryViewModel.swift */,
 				F408ACC8D034B72FF9346C76 /* HomeView.swift */,
+				80EB6CEDE58FD30A4BC467BE /* LLMService.swift */,
+				E0924461A409E76F7CC7881A /* LocalLLMEngines.swift */,
 				D71F7EC6215383E28B8504D6 /* Models.swift */,
+				FE170875E59DB4941C4441FB /* NetworkService.swift */,
 				188D4A67A763047523D31AE1 /* OCRView.swift */,
+				48EC9808C4C60B63E6BAC9E9 /* PromptTemplates.swift */,
 				6FD11294844C01BF1B041A12 /* RootTabView.swift */,
 				EF0A7D33042C8959C4D5E809 /* SearchFlowViews.swift */,
 			);
@@ -162,9 +177,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				8996C6B976101B7FBEA8CD20 /* AISYSApp.swift in Sources */,
+				F712F650434C229033AFC935 /* CaseSummaryViewModel.swift in Sources */,
 				C4DABF681E9D0290768E3FB4 /* HomeView.swift in Sources */,
+				1C43007E9CD651F2878094CB /* LLMService.swift in Sources */,
+				69718A360E32436E7D1A3273 /* LocalLLMEngines.swift in Sources */,
 				0134EB00FCADE9C6760E94C3 /* Models.swift in Sources */,
+				24D17AE6F904AB34297D556D /* NetworkService.swift in Sources */,
 				A562AF02780501D1737514AE /* OCRView.swift in Sources */,
+				0B7A2E2CC0663A1C2DB09513 /* PromptTemplates.swift in Sources */,
 				33B554E67648A09D2B3FA223 /* RootTabView.swift in Sources */,
 				B932ED19AEA38751B581B486 /* SearchFlowViews.swift in Sources */,
 			);

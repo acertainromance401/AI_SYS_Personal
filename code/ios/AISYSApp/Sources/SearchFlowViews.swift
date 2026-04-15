@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SearchView: View {
     @EnvironmentObject private var store: ReviewStore
+    @StateObject private var viewModel = CaseSummaryViewModel()
     @State private var keyword = ""
 
     var body: some View {
@@ -12,27 +13,56 @@ struct SearchView: View {
                 Text("키워드, 사건번호 또는 문서 스캔으로 정밀한 판례 정보를 찾으세요.")
                     .foregroundStyle(.secondary)
 
-                TextField("키워드 검색", text: $keyword)
-                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    TextField("키워드 검색", text: $keyword)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { Task { await viewModel.search(query: keyword) } }
+                    Button {
+                        Task { await viewModel.search(query: keyword) }
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.isSearching || keyword.isEmpty)
+                }
 
                 Text("추천 키워드")
                     .font(.headline)
                 HStack {
-                    TagView(text: "영장주의")
-                    TagView(text: "자백배제법칙")
-                    TagView(text: "위법수집증거")
+                    ForEach(["영장주의", "자백배제법칙", "위법수집증거"], id: \.self) { kw in
+                        Button { keyword = kw; Task { await viewModel.search(query: kw) } }
+                        label: { TagView(text: kw) }
+                        .buttonStyle(.plain)
+                    }
                 }
 
                 Text("검색 결과")
                     .font(.title3.bold())
 
-                let results = store.filteredResults(keyword: keyword)
-                if results.isEmpty {
-                    Text("검색 결과가 없습니다. 추천 키워드로 다시 시도해보세요.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .padding(.vertical, 8)
+                if viewModel.isSearching {
+                    ProgressView("검색 중...").frame(maxWidth: .infinity)
+                } else if let err = viewModel.errorMessage {
+                    Text(err).foregroundStyle(.red).font(.subheadline)
+                } else if viewModel.searchResults.isEmpty && !keyword.isEmpty {
+                    Text("검색 결과가 없습니다. 다른 키워드로 시도해보세요.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                } else if !viewModel.searchResults.isEmpty {
+                    ForEach(viewModel.searchResults) { apiCase in
+                        NavigationLink {
+                            CaseSummaryView(apiCase: apiCase, viewModel: viewModel)
+                        } label: {
+                            SearchResultCard(
+                                title: apiCase.caseName,
+                                subtitle: "\(apiCase.courtName)  \(apiCase.caseNumber)",
+                                tags: apiCase.subject.isEmpty ? [] : ["#\(apiCase.subject)"],
+                                summary: apiCase.issueSummary ?? ""
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
                 } else {
+                    // 초기 상태: 더미 데이터 표시
+                    let results = store.filteredResults(keyword: keyword)
                     ForEach(results) { item in
                         NavigationLink {
                             CaseSummaryView(detail: item.detail)
@@ -56,32 +86,57 @@ struct SearchView: View {
 
 struct CaseSummaryView: View {
     @EnvironmentObject private var store: ReviewStore
-    let detail: CaseDetail
+    // 실제 API 데이터 경로
+    var apiCase: APICase? = nil
+    @ObservedObject var viewModel: CaseSummaryViewModel = CaseSummaryViewModel()
+    // 더미 데이터 폴백 경로
+    var detail: CaseDetail? = nil
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text(detail.title)
-                    .font(.largeTitle.bold())
+                if let resolved = viewModel.displayDetail ?? detail {
+                    Text(resolved.title).font(.largeTitle.bold())
 
-                InfoCard(title: "핵심 쟁점", detail: detail.issue)
-                InfoCard(title: "판결 결론", detail: detail.conclusion)
-                InfoCard(title: "시험 포인트", detail: detail.examPoint)
+                    // LLM 추론 진행 상态 표시
+                    if viewModel.isSummarizing {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Llama가 판례를 분석 중입니다...")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
 
-                NavigationLink("관련 문제 보기") {
-                    QuizView(question: store.sampleQuestion)
-                }
-                .buttonStyle(.borderedProminent)
+                    InfoCard(title: "핵심 쟁점", detail: resolved.issue)
+                    InfoCard(title: "판결 결론", detail: resolved.conclusion)
+                    InfoCard(title: "시험 포인트", detail: resolved.examPoint)
 
-                Text("유사 판례 리스트")
-                    .font(.title2.bold())
-                ForEach(detail.similarCases, id: \.self) { item in
-                    InfoCard(title: item, detail: "유사 쟁점 비교 학습용 더미 데이터")
+                    if let err = viewModel.errorMessage {
+                        Text(err).foregroundStyle(.red).font(.caption)
+                    }
+
+                    NavigationLink("관련 문제 보기") {
+                        QuizView(question: store.sampleQuestion)
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    if !resolved.similarCases.isEmpty {
+                        Text("유사 판례 리스트").font(.title2.bold())
+                        ForEach(resolved.similarCases, id: \.self) { item in
+                            InfoCard(title: item, detail: "유사 쟁점 비교 학습용")
+                        }
+                    }
                 }
             }
             .padding()
         }
         .navigationTitle("판례 요약")
+        .task {
+            if let c = apiCase {
+                await viewModel.select(caseItem: c)
+            }
+        }
     }
 }
 

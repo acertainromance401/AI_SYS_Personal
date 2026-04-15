@@ -1,5 +1,4 @@
 from fastapi import FastAPI, HTTPException, Query
-
 from .database import get_conn
 from .schemas import CaseItem, HealthResponse, SearchResponse
 
@@ -118,3 +117,5 @@ def search_cases(
         for row in rows
     ]
     return SearchResponse(total=len(items), items=items)
+    return SearchResponse(total=len(items), items=items)
+
