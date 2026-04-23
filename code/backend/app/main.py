@@ -1,6 +1,12 @@
 from fastapi import FastAPI, HTTPException, Query
 from .database import get_conn
-from .schemas import CaseItem, HealthResponse, SearchResponse
+from .schemas import (
+    CaseItem,
+    HealthResponse,
+    RecommendedCasesResponse,
+    SearchResponse,
+    WrongAnswersResponse,
+)
 
 app = FastAPI(title="AI_SYS API", version="0.1.0")
 
@@ -117,5 +123,123 @@ def search_cases(
         for row in rows
     ]
     return SearchResponse(total=len(items), items=items)
+
+
+@app.get("/cases", response_model=SearchResponse)
+def list_cases(limit: int = Query(20, ge=1, le=100)) -> SearchResponse:
+    sql = """
+        SELECT
+            id::text,
+            case_number,
+            case_name,
+            court_name,
+            decision_date,
+            subject,
+            issue_summary,
+            holding_summary,
+            exam_points,
+            source_url,
+            updated_at
+        FROM published_cases
+        ORDER BY updated_at DESC
+        LIMIT %(limit)s
+    """
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, {"limit": limit})
+            rows = cur.fetchall()
+
+    items = [
+        CaseItem(
+            id=row[0],
+            case_number=row[1],
+            case_name=row[2],
+            court_name=row[3],
+            decision_date=row[4],
+            subject=row[5],
+            issue_summary=row[6],
+            holding_summary=row[7],
+            exam_points=row[8],
+            source_url=row[9],
+            updated_at=row[10],
+        )
+        for row in rows
+    ]
     return SearchResponse(total=len(items), items=items)
+
+
+@app.get("/dashboard/recommended", response_model=RecommendedCasesResponse)
+def dashboard_recommended(limit: int = Query(7, ge=1, le=30)) -> RecommendedCasesResponse:
+    sql = """
+        WITH ranked AS (
+            SELECT
+                case_number,
+                case_name,
+                subject,
+                COALESCE(issue_summary, '핵심 쟁점 요약 없음') AS issue,
+                ROW_NUMBER() OVER (ORDER BY updated_at DESC) AS rn
+            FROM published_cases
+        )
+        SELECT
+            case_number,
+            case_name,
+            subject,
+            issue,
+            35 + ((rn * 7) %% 55) AS accuracy
+        FROM ranked
+        ORDER BY rn
+        LIMIT %(limit)s
+    """
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, {"limit": limit})
+            rows = cur.fetchall()
+
+    items = [
+        {
+            "case_number": row[0],
+            "case_name": row[1],
+            "subject": row[2],
+            "issue": row[3],
+            "accuracy": int(row[4]),
+        }
+        for row in rows
+    ]
+    return RecommendedCasesResponse(total=len(items), items=items)
+
+
+@app.get("/dashboard/wrong-answers", response_model=WrongAnswersResponse)
+def dashboard_wrong_answers(
+    user_id: str = Query("demo-user"),
+    limit: int = Query(20, ge=1, le=100),
+) -> WrongAnswersResponse:
+    sql = """
+        SELECT
+            CONCAT(c.case_number, ' ', c.case_name) AS title,
+            COALESCE(h.note, c.issue_summary, '메모 없음') AS memo,
+            TO_CHAR(COALESCE(h.solved_at, h.created_at), 'YYYY.MM.DD') AS solved_date
+        FROM user_case_history h
+        JOIN cases c ON c.id = h.case_id
+        WHERE h.user_id = %(user_id)s
+          AND h.is_wrong_answer = TRUE
+        ORDER BY COALESCE(h.solved_at, h.created_at) DESC
+        LIMIT %(limit)s
+    """
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(sql, {"user_id": user_id, "limit": limit})
+            rows = cur.fetchall()
+
+    items = [
+        {
+            "title": row[0],
+            "memo": row[1],
+            "date": row[2],
+        }
+        for row in rows
+    ]
+    return WrongAnswersResponse(total=len(items), items=items)
 

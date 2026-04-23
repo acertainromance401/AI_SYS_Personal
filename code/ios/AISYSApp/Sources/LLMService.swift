@@ -26,7 +26,7 @@ enum LLMError: LocalizedError {
 
 // MARK: - LLMService
 //
-// 역할: MLX 없이 로컬 규칙 기반 요약을 생성합니다.
+// 역할: MLX 없이 로컬 요약/퀴즈 생성을 제공합니다.
 // 추후 llama.cpp/CoreML 엔진으로 교체할 때 인터페이스는 그대로 유지합니다.
 
 @MainActor
@@ -108,6 +108,45 @@ final class LLMService: ObservableObject {
         return LLMSummary(rawOutput: fallbackRaw)
     }
 
+    /// 판례 데이터를 받아 객관식 퀴즈를 생성합니다.
+    func generateQuiz(caseItem: APICase, summary: LLMSummary?) async throws -> QuizQuestion {
+        guard case .ready = state else { throw LLMError.notReady }
+
+        state = .inferring
+        defer {
+            if case .inferring = state { state = .ready }
+        }
+
+        let issue = summary?.keyIssue ?? caseItem.issueSummary ?? ""
+        let holding = summary?.rulingPoint ?? caseItem.holdingSummary ?? ""
+        let examTakeaway = summary?.examTakeaway ?? caseItem.examPoints ?? ""
+        let evidenceBlock = """
+        [1] \(caseItem.caseNumber) \(caseItem.caseName)
+        쟁점: \(issue)
+        결론: \(holding)
+        시험포인트: \(examTakeaway)
+        """
+        let prompt = LLMPromptTemplate.quiz(
+            question: "해당 판례의 핵심 쟁점과 시험 포인트를 점검하는 객관식 문제를 만들어라.",
+            evidenceBlock: evidenceBlock
+        )
+
+        do {
+            let rawOutput = try await activeEngine.generate(prompt: prompt, maxTokens: 320)
+            if let question = QuizQuestion(
+                rawOutput: rawOutput,
+                title: caseItem.caseName,
+                fallbackKeywords: [caseItem.caseNumber, caseItem.subject].filter { !$0.isEmpty }
+            ) {
+                return question
+            }
+        } catch {
+            return buildFallbackQuiz(caseItem: caseItem, summary: summary)
+        }
+
+        return buildFallbackQuiz(caseItem: caseItem, summary: summary)
+    }
+
     /// 두 판례를 비교 분석합니다.
     func compare(question: String, cases: [APICase]) async throws -> String {
         guard case .ready = state else { throw LLMError.notReady }
@@ -162,6 +201,22 @@ final class LLMService: ObservableObject {
 
         정리: 사건번호별 핵심 쟁점을 기준으로 공통점과 차이점을 확인하세요.
         """
+    }
+
+    private func buildFallbackQuiz(caseItem: APICase, summary: LLMSummary?) -> QuizQuestion {
+        let issue = summary?.keyIssue ?? caseItem.issueSummary ?? "쟁점 정보 없음"
+        let holding = summary?.rulingPoint ?? caseItem.holdingSummary ?? "결론 정보 없음"
+        let examTakeaway = summary?.examTakeaway ?? caseItem.examPoints ?? "시험 포인트 정보 없음"
+        let wrongOption = "쟁점과 무관하게 결론만 외워도 동일한 판단이 가능하다"
+
+        return QuizQuestion(
+            title: caseItem.caseName,
+            prompt: "다음 중 \(caseItem.caseName) 판례 학습 포인트로 가장 부적절한 것을 고르시오.",
+            options: [issue, holding, examTakeaway, wrongOption],
+            correctIndex: 3,
+            explanation: "해당 판례 학습은 쟁점, 결론, 시험 포인트를 함께 이해해야 하며 결론만 암기하는 접근은 부적절합니다.",
+            keywords: [caseItem.caseNumber, caseItem.subject].filter { !$0.isEmpty }
+        )
     }
 
     private var activeEngine: LocalLLMEngine {

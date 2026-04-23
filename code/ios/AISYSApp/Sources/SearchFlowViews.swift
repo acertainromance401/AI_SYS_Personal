@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SearchView: View {
     @EnvironmentObject private var store: ReviewStore
+    @EnvironmentObject private var runtime: AppRuntimeState
     @StateObject private var viewModel = CaseSummaryViewModel()
     @State private var keyword = ""
 
@@ -39,6 +40,12 @@ struct SearchView: View {
                 Text("검색 결과")
                     .font(.title3.bold())
 
+                if !viewModel.backendConnected {
+                    Text("백엔드(DB) 연결이 없어 검색 결과를 불러오지 못했습니다.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
                 if viewModel.isSearching {
                     ProgressView("검색 중...").frame(maxWidth: .infinity)
                 } else if let err = viewModel.errorMessage {
@@ -61,31 +68,30 @@ struct SearchView: View {
                         .buttonStyle(.plain)
                     }
                 } else {
-                    // 초기 상태: 더미 데이터 표시
-                    let results = store.filteredResults(keyword: keyword)
-                    ForEach(results) { item in
-                        NavigationLink {
-                            CaseSummaryView(detail: item.detail)
-                        } label: {
-                            SearchResultCard(
-                                title: item.title,
-                                subtitle: item.subtitle,
-                                tags: item.tags,
-                                summary: item.summary
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
+                    Text("표시할 판례가 없습니다. 백엔드 연결 또는 키워드를 확인해주세요.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
             }
             .padding()
         }
         .navigationTitle("Search")
+        .withSmallBackButton()
+        .task {
+            await viewModel.loadInitialCasesIfNeeded()
+        }
+        .onChange(of: runtime.pendingSearchQuery) { newValue in
+            guard let query = newValue?.trimmingCharacters(in: .whitespacesAndNewlines), !query.isEmpty else {
+                return
+            }
+            keyword = query
+            runtime.pendingSearchQuery = nil
+            Task { await viewModel.search(query: query) }
+        }
     }
 }
 
 struct CaseSummaryView: View {
-    @EnvironmentObject private var store: ReviewStore
     // 실제 API 데이터 경로
     var apiCase: APICase? = nil
     @ObservedObject var viewModel: CaseSummaryViewModel = CaseSummaryViewModel()
@@ -108,6 +114,15 @@ struct CaseSummaryView: View {
                         .padding(.vertical, 4)
                     }
 
+                    if viewModel.isGeneratingQuiz {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Llama가 관련 문제를 생성 중입니다...")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+
                     InfoCard(title: "핵심 쟁점", detail: resolved.issue)
                     InfoCard(title: "판결 결론", detail: resolved.conclusion)
                     InfoCard(title: "시험 포인트", detail: resolved.examPoint)
@@ -116,10 +131,20 @@ struct CaseSummaryView: View {
                         Text(err).foregroundStyle(.red).font(.caption)
                     }
 
-                    NavigationLink("관련 문제 보기") {
-                        QuizView(question: store.sampleQuestion)
+                    Button {
+                        Task { await viewModel.generateQuizForSelectedCase() }
+                    } label: {
+                        Text(viewModel.quizQuestion == nil ? "퀴즈 생성" : "퀴즈 다시 생성")
                     }
                     .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.isSummarizing || viewModel.isGeneratingQuiz)
+
+                    if let question = viewModel.quizQuestion {
+                        NavigationLink("관련 문제 보기") {
+                            QuizView(question: question)
+                        }
+                        .buttonStyle(.bordered)
+                    }
 
                     if !resolved.similarCases.isEmpty {
                         Text("유사 판례 리스트").font(.title2.bold())
@@ -132,12 +157,14 @@ struct CaseSummaryView: View {
             .padding()
         }
         .navigationTitle("판례 요약")
+        .withSmallBackButton()
         .task {
             if let c = apiCase {
                 await viewModel.select(caseItem: c)
             }
         }
     }
+
 }
 
 struct QuizView: View {
@@ -212,6 +239,7 @@ struct QuizView: View {
             .padding()
         }
         .navigationTitle("문제 풀이")
+        .withSmallBackButton()
     }
 }
 
@@ -256,6 +284,7 @@ struct WrongAnswerSaveView: View {
             Button("확인", role: .cancel) { dismiss() }
         }
         .navigationTitle("오답 저장")
+        .withSmallBackButton()
     }
 }
 
@@ -272,21 +301,54 @@ struct ReviewView: View {
             .padding(.vertical, 4)
         }
         .navigationTitle("Review")
+        .withSmallBackButton()
     }
 }
 
 struct MyPageView: View {
+    @AppStorage(NetworkService.overrideKey) private var apiBaseURLOverride: String = ""
+    @State private var serverURLInput = ""
+
     var body: some View {
         Form {
             Section("계정") {
                 Text("AI_SYS 사용자")
                 Text("경찰 공무원 시험 준비")
             }
+            Section("서버 설정") {
+                TextField("http://192.168.x.x:8000", text: $serverURLInput)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                Button("API 서버 주소 저장") {
+                    apiBaseURLOverride = serverURLInput.trimmingCharacters(in: .whitespacesAndNewlines)
+                    Task { await NetworkService.shared.configureBaseURL(apiBaseURLOverride) }
+                }
+                .buttonStyle(.borderedProminent)
+
+                if !apiBaseURLOverride.isEmpty {
+                    Text("현재 오버라이드: \(apiBaseURLOverride)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Button("오버라이드 초기화") {
+                    apiBaseURLOverride = ""
+                    serverURLInput = ""
+                    Task { await NetworkService.shared.configureBaseURL("") }
+                }
+                .buttonStyle(.bordered)
+            }
             Section("앱 정보") {
                 Text("버전 1.0.0")
             }
         }
         .navigationTitle("My Page")
+        .withSmallBackButton()
+        .task {
+            if serverURLInput.isEmpty {
+                serverURLInput = apiBaseURLOverride
+            }
+        }
     }
 }
 
@@ -354,3 +416,4 @@ private struct TagView: View {
             .clipShape(Capsule())
     }
 }
+

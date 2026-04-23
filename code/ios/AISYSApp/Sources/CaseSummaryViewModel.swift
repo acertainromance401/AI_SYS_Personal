@@ -17,11 +17,15 @@ final class CaseSummaryViewModel: ObservableObject {
     @Published private(set) var searchResults: [APICase] = []
     @Published private(set) var selectedCase: APICase?
     @Published private(set) var summary: LLMSummary?
+    @Published private(set) var quizQuestion: QuizQuestion?
 
     @Published private(set) var isSearching = false
     @Published private(set) var isSummarizing = false
+    @Published private(set) var isGeneratingQuiz = false
     @Published private(set) var llmState: LLMState = .idle
     @Published private(set) var errorMessage: String?
+    @Published private(set) var backendConnected = false
+    @Published private(set) var hasLoadedInitialCases = false
 
     // MARK: - Dependencies
 
@@ -55,8 +59,29 @@ final class CaseSummaryViewModel: ObservableObject {
         defer { isSearching = false }
         do {
             searchResults = try await network.searchCases(query: query)
+            backendConnected = true
         } catch {
+            backendConnected = false
             errorMessage = error.localizedDescription
+        }
+    }
+
+    /// 앱 시작 시 DB 기반 더미/시드 데이터를 우선 로드합니다.
+    func loadInitialCasesIfNeeded() async {
+        guard !hasLoadedInitialCases else { return }
+        hasLoadedInitialCases = true
+        isSearching = true
+        defer { isSearching = false }
+
+        backendConnected = await network.healthCheck()
+        guard backendConnected else {
+            return
+        }
+
+        do {
+            searchResults = try await network.listCases(limit: 20)
+        } catch {
+            backendConnected = false
         }
     }
 
@@ -66,8 +91,17 @@ final class CaseSummaryViewModel: ObservableObject {
     func select(caseItem: APICase) async {
         selectedCase = caseItem
         summary = nil
-        await ensureModelReady()
+        quizQuestion = nil
+        guard await ensureModelReady() else { return }
         await performSummarize(caseItem: caseItem)
+    }
+
+    func generateQuizForSelectedCase() async {
+        guard let caseItem = selectedCase else { return }
+        errorMessage = nil
+        quizQuestion = nil
+        guard await ensureModelReady() else { return }
+        await performQuizGeneration(caseItem: caseItem)
     }
 
     // MARK: - Computed Display Values
@@ -83,15 +117,28 @@ final class CaseSummaryViewModel: ObservableObject {
 
     // MARK: - Private
 
-    private func ensureModelReady() async {
+    private func ensureModelReady() async -> Bool {
         switch llm.state {
-        case .idle:
-            await llm.load()
-        case .error:
+        case .idle, .error:
             await llm.load()
         default:
             break
         }
+
+        let deadline = Date().addingTimeInterval(12)
+        while Date() < deadline {
+            switch llm.state {
+            case .ready:
+                return true
+            case .idle, .error:
+                await llm.load()
+            case .loading, .inferring:
+                try? await Task.sleep(nanoseconds: 120_000_000)
+            }
+        }
+
+        errorMessage = "LLM 초기화가 지연되고 있습니다. 잠시 후 다시 시도해주세요."
+        return false
     }
 
     private func performSummarize(caseItem: APICase) async {
@@ -99,6 +146,16 @@ final class CaseSummaryViewModel: ObservableObject {
         defer { isSummarizing = false }
         do {
             summary = try await llm.summarize(caseItem: caseItem)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func performQuizGeneration(caseItem: APICase) async {
+        isGeneratingQuiz = true
+        defer { isGeneratingQuiz = false }
+        do {
+            quizQuestion = try await llm.generateQuiz(caseItem: caseItem, summary: summary)
         } catch {
             errorMessage = error.localizedDescription
         }

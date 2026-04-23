@@ -27,6 +27,30 @@ class SearchResponse(BaseModel):
     items: list[CaseItem]
 
 
+class RecommendedCaseItem(BaseModel):
+    case_number: str
+    case_name: str
+    subject: str
+    issue: str
+    accuracy: int
+
+
+class WrongAnswerListItem(BaseModel):
+    title: str
+    memo: str
+    date: str
+
+
+class RecommendedCasesResponse(BaseModel):
+    total: int
+    items: list[RecommendedCaseItem]
+
+
+class WrongAnswersResponse(BaseModel):
+    total: int
+    items: list[WrongAnswerListItem]
+
+
 class SearchEvidence(BaseModel):
     rank: int
     case_number: str

@@ -2,6 +2,9 @@ import SwiftUI
 
 struct HomeView: View {
     @EnvironmentObject private var store: ReviewStore
+    @State private var isLoadingDashboard = false
+    @State private var dashboardError: String?
+    @State private var currentAPIBaseURL = ""
 
     var body: some View {
         ScrollView {
@@ -12,11 +15,17 @@ struct HomeView: View {
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: 10) {
-                    Label("복습 효율 94%", systemImage: "sparkles")
-                    Label("오늘 목표 12건", systemImage: "target")
+                    Label("추천 \(store.recommendedCases.count)건", systemImage: "sparkles")
+                    Label("오답 \(store.wrongAnswers.count)건", systemImage: "target")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+                if !currentAPIBaseURL.isEmpty {
+                    Text("API: \(currentAPIBaseURL)")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
 
                 HStack(spacing: 12) {
                     Button("복습 시작") {}
@@ -29,6 +38,15 @@ struct HomeView: View {
 
                 Text("오늘의 추천 복습")
                     .font(.title2.bold())
+                if isLoadingDashboard {
+                    ProgressView("DB 대시보드 동기화 중...")
+                        .font(.caption)
+                }
+                if let dashboardError {
+                    Text(dashboardError)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
                 Text("총 \(store.recommendedCases.count)건")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -77,5 +95,36 @@ struct HomeView: View {
             .padding()
         }
         .navigationTitle("AI_SYS")
+        .withSmallBackButton()
+        .task {
+            await loadDashboardFromBackendIfNeeded()
+        }
+    }
+
+    private func loadDashboardFromBackendIfNeeded() async {
+        if store.isRemoteDashboardLoaded {
+            return
+        }
+
+        isLoadingDashboard = true
+        defer { isLoadingDashboard = false }
+
+        currentAPIBaseURL = await NetworkService.shared.currentBaseURLString()
+
+        let isHealthy = await NetworkService.shared.healthCheck()
+        guard isHealthy else {
+            dashboardError = "백엔드 연결 실패: 대시보드 데이터를 불러오지 못했습니다."
+            return
+        }
+
+        do {
+            async let recommended = NetworkService.shared.listRecommendedCases(limit: 7)
+            async let wrong = NetworkService.shared.listWrongAnswers(userID: "demo-user", limit: 20)
+            let payload = try await (recommended, wrong)
+            store.applyRemoteDashboard(recommended: payload.0, wrong: payload.1)
+            dashboardError = nil
+        } catch {
+            dashboardError = "대시보드 로딩 실패: \(error.localizedDescription)"
+        }
     }
 }

@@ -1,14 +1,17 @@
 import SwiftUI
 
 struct RootTabView: View {
+    @EnvironmentObject private var runtime: AppRuntimeState
+
     var body: some View {
-        TabView {
+        TabView(selection: $runtime.selectedTab) {
             NavigationStack {
                 HomeView()
             }
             .tabItem {
                 Label("Home", systemImage: "house.fill")
             }
+            .tag(0)
 
             NavigationStack {
                 OCRView()
@@ -16,6 +19,7 @@ struct RootTabView: View {
             .tabItem {
                 Label("OCR", systemImage: "doc.viewfinder")
             }
+            .tag(1)
 
             NavigationStack {
                 SearchView()
@@ -23,6 +27,7 @@ struct RootTabView: View {
             .tabItem {
                 Label("Search", systemImage: "magnifyingglass")
             }
+            .tag(2)
 
             NavigationStack {
                 ReviewView()
@@ -30,6 +35,7 @@ struct RootTabView: View {
             .tabItem {
                 Label("Review", systemImage: "bookmark")
             }
+            .tag(3)
 
             NavigationStack {
                 MyPageView()
@@ -37,6 +43,7 @@ struct RootTabView: View {
             .tabItem {
                 Label("My Page", systemImage: "person.fill")
             }
+            .tag(4)
         }
         .tint(Color.blue)
     }
